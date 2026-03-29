@@ -687,7 +687,7 @@ async def get_current_user(
     except ValueError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-    result = await db.execute(select(User).where(User.id == payload["sub"], User.is_active == True))
+    result = await db.execute(select(User).where(User.id == uuid.UUID(payload["sub"]), User.is_active == True))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
@@ -2354,7 +2354,69 @@ export default function Alerts() {
 }
 ```
 
-- [ ] **Step 7: 启动前端验证**
+- [ ] **Step 7: 添加后端 Excel 导出端点（backend/app/routers/gate_events.py 新增）**
+
+先安装依赖，在 `backend/requirements.txt` 末尾追加：
+```
+openpyxl==3.1.2
+```
+
+在 `gate_events.py` 末尾添加：
+
+```python
+from fastapi.responses import StreamingResponse
+import openpyxl
+import io
+
+@router.get("/export")
+async def export_gate_events(
+    plate: str | None = Query(None),
+    direction: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    q = select(GateEvent).where(GateEvent.factory_id == user.factory_id)
+    if plate:
+        q = q.where(GateEvent.plate_number.ilike(f"%{plate}%"))
+    if direction:
+        q = q.where(GateEvent.direction == direction)
+    q = q.order_by(desc(GateEvent.captured_at)).limit(10000)
+    result = await db.execute(q)
+    events = result.scalars().all()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "出入记录"
+    ws.append(["车牌", "方向", "出入口", "时间", "置信度", "审核状态"])
+    for e in events:
+        ws.append([
+            e.plate_number,
+            "入场" if e.direction.value == "entry" else "出场",
+            str(e.gate_id) if e.gate_id else "",
+            e.captured_at.strftime("%Y-%m-%d %H:%M:%S"),
+            f"{e.confidence_score:.2%}" if e.confidence_score else "",
+            e.review_status.value,
+        ])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=gate_events.xlsx"},
+    )
+```
+
+在 `frontend/src/pages/GateEvents.tsx` 的 Space 组件里添加导出按钮：
+
+```typescript
+<Button onClick={() => window.open(`http://localhost:8000/gate-events/export?${new URLSearchParams({ ...(filterPlate ? { plate: filterPlate } : {}) }).toString()}`)}>
+  导出 Excel
+</Button>
+```
+
+- [ ] **Step 8: 启动前端验证**
 
 ```bash
 docker compose up frontend -d
