@@ -111,6 +111,10 @@ async def create_gate_event(
     await db.commit()
     await db.refresh(event)
 
+    if review_status == ReviewStatus.pending_review:
+        from app.services.alert_engine import create_pending_review_alert
+        await create_pending_review_alert(db, body.factory_id, body.plate_number)
+
     # Async broadcast (non-blocking, best-effort)
     try:
         from app.ws.manager import manager
