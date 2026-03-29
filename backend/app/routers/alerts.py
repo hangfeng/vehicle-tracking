@@ -13,7 +13,7 @@ router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 @router.get("", response_model=list[AlertOut])
 async def list_alerts(
-    status: str | None = Query(None),
+    status: AlertStatus | None = Query(None),
     limit: int = Query(50, le=200),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),

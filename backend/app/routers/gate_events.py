@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from app.database import get_db
-from app.models.gate_event import GateEvent, ReviewStatus
+from app.models.gate_event import GateEvent, ReviewStatus, Direction
 from app.models.vehicle import Vehicle, VehicleStatus
 from app.models.user import User, UserRole
 from app.schemas.gate_event import GateEventCreate, GateEventOut, ReviewRequest
@@ -19,8 +19,8 @@ router = APIRouter(prefix="/gate-events", tags=["gate-events"])
 @router.get("", response_model=list[GateEventOut])
 async def list_gate_events(
     plate: str | None = Query(None),
-    direction: str | None = Query(None),
-    review_status: str | None = Query(None),
+    direction: Direction | None = Query(None),
+    review_status: ReviewStatus | None = Query(None),
     limit: int = Query(50, le=200),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_db),
@@ -80,6 +80,10 @@ async def create_gate_event(
     body: GateEventCreate,
     db: AsyncSession = Depends(get_db),
 ):
+    """
+    Called by AI recognition service only (internal network).
+    No user auth required — protected by network isolation in Docker Compose.
+    """
     review_status = (
         ReviewStatus.auto_confirmed
         if (body.confidence_score or 0) >= settings.ai_confidence_threshold
