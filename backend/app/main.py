@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, vehicles, gate_events, alerts
+from app.routers import auth, vehicles, gate_events, alerts, dashboard
 
 app = FastAPI(title="Vehicle Tracking API", version="1.0.0")
 
@@ -16,6 +16,7 @@ app.include_router(auth.router)
 app.include_router(vehicles.router)
 app.include_router(gate_events.router)
 app.include_router(alerts.router)
+app.include_router(dashboard.router)
 
 @app.get("/health")
 async def health():
