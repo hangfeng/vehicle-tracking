@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+# Import all models to ensure SQLAlchemy registers them before use
+from app.models import factory, user, vehicle, location, gate_event, alert  # noqa: F401
 from app.routers import auth, vehicles, gate_events, alerts, dashboard
 
 app = FastAPI(title="Vehicle Tracking API", version="1.0.0")
