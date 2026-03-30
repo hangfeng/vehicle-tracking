@@ -7,6 +7,9 @@ import Dashboard from "./pages/Dashboard";
 import GateEvents from "./pages/GateEvents";
 import Vehicles from "./pages/Vehicles";
 import Alerts from "./pages/Alerts";
+import Users from "./pages/Users";
+import Reports from "./pages/Reports";
+import Settings from "./pages/Settings";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token);
@@ -37,6 +40,9 @@ export default function App() {
           <Route path="gate-events" element={<GateEvents />} />
           <Route path="vehicles" element={<Vehicles />} />
           <Route path="alerts" element={<Alerts />} />
+          <Route path="users" element={<Users />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
     </BrowserRouter>
