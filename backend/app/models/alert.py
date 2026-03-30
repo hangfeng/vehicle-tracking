@@ -8,6 +8,7 @@ from app.database import Base
 class AlertType(str, enum.Enum):
     long_stay = "long_stay"
     pending_review = "pending_review"
+    path_deviation = "path_deviation"
 
 class AlertSeverity(str, enum.Enum):
     info = "info"

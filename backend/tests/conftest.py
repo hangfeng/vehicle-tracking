@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from app.main import app
 from app.database import Base, get_db
 from app.models.user import User, UserRole
-from app.models import factory, vehicle, location, gate_event, alert  # noqa: F401 - register all tables
+from app.models import factory, vehicle, location, gate_event, alert, checkpoint, path_template, vehicle_journey  # noqa: F401
 from app.services.auth import hash_password
 import uuid
 
@@ -56,6 +56,20 @@ async def manager_user(db_session):
         phone="13800000002",
         password_hash=hash_password("password123"),
         role=UserRole.factory_manager,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    return user
+
+@pytest_asyncio.fixture
+async def admin_user(db_session):
+    user = User(
+        id=uuid.uuid4(),
+        factory_id=None,
+        name="集团管理员",
+        phone="13800000003",
+        password_hash=hash_password("password123"),
+        role=UserRole.group_admin,
     )
     db_session.add(user)
     await db_session.commit()

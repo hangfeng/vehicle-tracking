@@ -11,10 +11,13 @@ if config.config_file_name is not None:
 # Import all models so autogenerate can detect them
 from app.models.factory import Factory
 from app.models.user import User
+from app.models.checkpoint import CheckPoint  # must be before Vehicle due to FK dep
 from app.models.vehicle import Vehicle
 from app.models.location import Location
 from app.models.gate_event import GateEvent
 from app.models.alert import Alert
+from app.models.path_template import PathTemplate, PathTemplateStep
+from app.models.vehicle_journey import VehicleJourney, JourneyEvent
 from app.database import Base
 
 target_metadata = Base.metadata

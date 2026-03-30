@@ -23,4 +23,5 @@ class Vehicle(Base):
     status: Mapped[VehicleStatus] = mapped_column(SAEnum(VehicleStatus), default=VehicleStatus.unknown)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     note: Mapped[str | None] = mapped_column(Text)
+    current_checkpoint_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("checkpoints.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
