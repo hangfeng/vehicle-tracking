@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 # Import all models to ensure SQLAlchemy registers them before use
 from app.models import factory, user, vehicle, location, gate_event, alert, checkpoint, path_template, vehicle_journey  # noqa: F401
-from app.routers import auth, vehicles, gate_events, alerts, dashboard, users, checkpoints, path_templates
+from app.routers import auth, vehicles, gate_events, alerts, dashboard, users, checkpoints, path_templates, vehicle_journeys
 
 app = FastAPI(title="Vehicle Tracking API", version="1.0.0")
 
@@ -22,6 +22,7 @@ app.include_router(dashboard.router)
 app.include_router(users.router)
 app.include_router(checkpoints.router)
 app.include_router(path_templates.router)
+app.include_router(vehicle_journeys.router)
 
 @app.get("/health")
 async def health():
