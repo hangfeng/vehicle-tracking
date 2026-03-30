@@ -8,6 +8,8 @@ import {
   Select,
   Space,
   Typography,
+  Popconfirm,
+  message,
 } from "antd";
 import { api } from "../api/client";
 import type { GateEvent } from "../types";
@@ -19,6 +21,7 @@ export default function GateEvents() {
   const [correctedPlate, setCorrectedPlate] = useState("");
   const [filterPlate, setFilterPlate] = useState("");
   const [filterStatus, setFilterStatus] = useState<string | undefined>();
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const fetchEvents = async () => {
     const params: Record<string, string> = {};
@@ -39,6 +42,14 @@ export default function GateEvents() {
       action,
     });
     setReviewing(null);
+    fetchEvents();
+  };
+
+  const handleBatchReview = async (action: "confirm" | "reject") => {
+    if (selectedIds.length === 0) return;
+    const resp = await api.post("/gate-events/batch-review", { ids: selectedIds, action });
+    message.success(`已处理 ${resp.data.updated} 条记录`);
+    setSelectedIds([]);
     fetchEvents();
   };
 
@@ -134,6 +145,17 @@ export default function GateEvents() {
           导出 Excel
         </Button>
       </Space>
+      {selectedIds.length > 0 && (
+        <Space style={{ marginBottom: 12 }}>
+          <span style={{ color: "#6b7280" }}>{selectedIds.length} 条已选中</span>
+          <Popconfirm title="批量确认选中记录？" onConfirm={() => handleBatchReview("confirm")}>
+            <Button type="primary" size="small">批量确认</Button>
+          </Popconfirm>
+          <Popconfirm title="批量拒绝选中记录？" onConfirm={() => handleBatchReview("reject")}>
+            <Button danger size="small">批量拒绝</Button>
+          </Popconfirm>
+        </Space>
+      )}
       <Table
         dataSource={events}
         columns={columns}
@@ -142,6 +164,13 @@ export default function GateEvents() {
         rowClassName={(r) =>
           r.review_status === "pending_review" ? "table-row-warning" : ""
         }
+        rowSelection={{
+          selectedRowKeys: selectedIds,
+          onChange: (keys) => setSelectedIds(keys as string[]),
+          getCheckboxProps: (record: GateEvent) => ({
+            disabled: record.review_status !== "pending_review",
+          }),
+        }}
       />
 
       <Modal

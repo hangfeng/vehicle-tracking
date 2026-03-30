@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { Table, Tag, Button, Modal, Form, Input, message } from "antd";
+import { Table, Tag, Button, Modal, Form, Input, message, Space, Upload } from "antd";
+import { UploadOutlined } from "@ant-design/icons";
+import type { UploadProps } from "antd";
 import { api } from "../api/client";
 import type { Vehicle } from "../types";
 import dayjs from "dayjs";
@@ -24,6 +26,27 @@ export default function Vehicles() {
     setAdding(false);
     form.resetFields();
     fetchVehicles();
+  };
+
+  const uploadProps: UploadProps = {
+    accept: ".xlsx,.xls",
+    showUploadList: false,
+    customRequest: async ({ file, onSuccess, onError }) => {
+      const formData = new FormData();
+      formData.append("file", file as File);
+      try {
+        const resp = await api.post("/vehicles/import", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        const { created, skipped, errors } = resp.data;
+        message.success(`导入完成：新增 ${created} 辆，跳过 ${skipped} 辆${errors.length ? `，${errors.length} 条错误` : ""}`);
+        if (onSuccess) onSuccess(resp.data);
+        fetchVehicles();
+      } catch (err) {
+        message.error("导入失败");
+        if (onError) onError(err as Error);
+      }
+    },
   };
 
   const statusMap: Record<string, [string, string]> = {
@@ -67,13 +90,17 @@ export default function Vehicles() {
 
   return (
     <div>
-      <Button
-        type="primary"
-        style={{ marginBottom: 16 }}
-        onClick={() => setAdding(true)}
-      >
-        添加车辆
-      </Button>
+      <Space style={{ marginBottom: 16 }}>
+        <Button
+          type="primary"
+          onClick={() => setAdding(true)}
+        >
+          添加车辆
+        </Button>
+        <Upload {...uploadProps}>
+          <Button icon={<UploadOutlined />}>导入 Excel</Button>
+        </Upload>
+      </Space>
       <Table dataSource={vehicles} columns={columns} rowKey="id" size="small" />
       <Modal
         title="添加车辆"
