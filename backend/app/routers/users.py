@@ -88,6 +88,9 @@ async def update_user(
         raise HTTPException(status_code=403, detail="Cannot modify user with this role")
     if actor.role == UserRole.factory_manager and target.factory_id != actor.factory_id:
         raise HTTPException(status_code=403, detail="Access denied")
+    # Check new role assignment is also permitted (prevent privilege escalation)
+    if body.role is not None and not _can_manage_role(actor, body.role):
+        raise HTTPException(status_code=403, detail="Cannot assign this role")
     for k, v in body.model_dump(exclude_none=True).items():
         setattr(target, k, v)
     await db.commit()
