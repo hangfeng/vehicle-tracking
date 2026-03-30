@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
@@ -154,3 +155,32 @@ async def review_gate_event(
     await db.commit()
     await db.refresh(event)
     return event
+
+class BatchReviewRequest(BaseModel):
+    ids: list[uuid.UUID]
+    action: str  # "confirm" or "reject"
+
+class BatchReviewResponse(BaseModel):
+    updated: int
+
+@router.post("/batch-review", response_model=BatchReviewResponse)
+async def batch_review_gate_events(
+    body: BatchReviewRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.operator, UserRole.factory_manager, UserRole.group_admin)),
+):
+    result = await db.execute(
+        select(GateEvent).where(
+            GateEvent.id.in_(body.ids),
+            GateEvent.factory_id == user.factory_id,
+            GateEvent.review_status == ReviewStatus.pending_review,
+        )
+    )
+    events = result.scalars().all()
+    new_status = ReviewStatus.manually_confirmed if body.action == "confirm" else ReviewStatus.rejected
+    for event in events:
+        event.review_status = new_status
+        event.reviewed_by = user.id
+        event.reviewed_at = datetime.utcnow()
+    await db.commit()
+    return BatchReviewResponse(updated=len(events))

@@ -1,7 +1,10 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException
+import io
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+import openpyxl
 from app.database import get_db
 from app.models.vehicle import Vehicle
 from app.models.user import User, UserRole
@@ -31,6 +34,63 @@ async def create_vehicle(
     await db.commit()
     await db.refresh(vehicle)
     return vehicle
+
+class ImportResponse(BaseModel):
+    created: int
+    skipped: int
+    errors: list[str]
+
+@router.post("/import", response_model=ImportResponse)
+async def import_vehicles(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.factory_manager, UserRole.group_admin)),
+):
+    content = await file.read()
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(content))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid Excel file")
+
+    ws = wb.active
+    created = 0
+    skipped = 0
+    errors = []
+
+    for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if not row or not row[0]:
+            continue
+        plate = str(row[0]).strip()
+        company = str(row[1]).strip() if len(row) > 1 and row[1] else None
+        contact_name = str(row[2]).strip() if len(row) > 2 and row[2] else None
+        contact_phone = str(row[3]).strip() if len(row) > 3 and row[3] else None
+
+        if not plate:
+            errors.append(f"Row {row_idx}: 车牌号不能为空")
+            continue
+        if not company:
+            errors.append(f"Row {row_idx}: 所属公司不能为空")
+            continue
+
+        existing = await db.execute(
+            select(Vehicle).where(Vehicle.plate_number == plate, Vehicle.factory_id == user.factory_id)
+        )
+        if existing.scalar_one_or_none():
+            skipped += 1
+            continue
+
+        vehicle = Vehicle(
+            plate_number=plate,
+            company=company,
+            contact_name=contact_name,
+            contact_phone=contact_phone,
+            factory_id=user.factory_id,
+        )
+        db.add(vehicle)
+        created += 1
+
+    await db.commit()
+    return ImportResponse(created=created, skipped=skipped, errors=errors)
 
 @router.patch("/{vehicle_id}", response_model=VehicleOut)
 async def update_vehicle(
