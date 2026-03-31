@@ -15,7 +15,7 @@ from app.schemas.report import (
     VehicleReport, VehicleActivity,
     AlertReport, AlertSummaryItem,
 )
-from app.deps import get_current_user
+from app.deps import apply_data_scope, get_current_user, get_data_scope
 import openpyxl
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -25,20 +25,24 @@ async def traffic_report(
     start_date: date = Query(...),
     end_date: date = Query(...),
     granularity: str = Query("day"),
+    factory_id: uuid.UUID | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
+    scope: str | list[uuid.UUID] = Depends(get_data_scope),
 ):
-    factory_id = user.factory_id
     start_dt = datetime.combine(start_date, datetime.min.time())
     end_dt = datetime.combine(end_date, datetime.max.time())
 
-    result = await db.execute(
+    q = apply_data_scope(
         select(GateEvent).where(
-            GateEvent.factory_id == factory_id,
             GateEvent.captured_at >= start_dt,
             GateEvent.captured_at <= end_dt,
-        )
+        ),
+        GateEvent.factory_id,
+        scope,
+        factory_id,
     )
+    result = await db.execute(q)
     events = result.scalars().all()
 
     total_entries = sum(1 for e in events if e.direction == Direction.entry)
@@ -67,25 +71,29 @@ async def traffic_report(
 async def vehicle_report(
     start_date: date = Query(...),
     end_date: date = Query(...),
+    factory_id: uuid.UUID | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
+    scope: str | list[uuid.UUID] = Depends(get_data_scope),
 ):
-    factory_id = user.factory_id
     start_dt = datetime.combine(start_date, datetime.min.time())
     end_dt = datetime.combine(end_date, datetime.max.time())
 
-    result = await db.execute(
+    q = apply_data_scope(
         select(GateEvent.vehicle_id, func.count().label("visits"))
         .where(
-            GateEvent.factory_id == factory_id,
             GateEvent.captured_at >= start_dt,
             GateEvent.captured_at <= end_dt,
             GateEvent.vehicle_id.isnot(None),
         )
         .group_by(GateEvent.vehicle_id)
         .order_by(func.count().desc())
-        .limit(50)
+        .limit(50),
+        GateEvent.factory_id,
+        scope,
+        factory_id,
     )
+    result = await db.execute(q)
     rows = result.all()
 
     activities = []
@@ -114,20 +122,24 @@ async def vehicle_report(
 async def alert_report(
     start_date: date = Query(...),
     end_date: date = Query(...),
+    factory_id: uuid.UUID | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
+    scope: str | list[uuid.UUID] = Depends(get_data_scope),
 ):
-    factory_id = user.factory_id
     start_dt = datetime.combine(start_date, datetime.min.time())
     end_dt = datetime.combine(end_date, datetime.max.time())
 
-    result = await db.execute(
+    q = apply_data_scope(
         select(Alert).where(
-            Alert.factory_id == factory_id,
             Alert.created_at >= start_dt,
             Alert.created_at <= end_dt,
-        )
+        ),
+        Alert.factory_id,
+        scope,
+        factory_id,
     )
+    result = await db.execute(q)
     alerts = result.scalars().all()
 
     total_active = sum(1 for a in alerts if a.status == AlertStatus.active)
@@ -145,20 +157,24 @@ async def export_report(
     start_date: date = Query(...),
     end_date: date = Query(...),
     format: str = Query("excel"),
+    factory_id: uuid.UUID | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
+    scope: str | list[uuid.UUID] = Depends(get_data_scope),
 ):
-    factory_id = user.factory_id
     start_dt = datetime.combine(start_date, datetime.min.time())
     end_dt = datetime.combine(end_date, datetime.max.time())
 
-    result = await db.execute(
+    q = apply_data_scope(
         select(GateEvent).where(
-            GateEvent.factory_id == factory_id,
             GateEvent.captured_at >= start_dt,
             GateEvent.captured_at <= end_dt,
-        ).order_by(GateEvent.captured_at)
+        ).order_by(GateEvent.captured_at),
+        GateEvent.factory_id,
+        scope,
+        factory_id,
     )
+    result = await db.execute(q)
     events = result.scalars().all()
 
     wb = openpyxl.Workbook()

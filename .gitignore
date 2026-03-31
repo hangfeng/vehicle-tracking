@@ -1,2 +1,15 @@
 __pycache__/
 *.pyc
+.DS_Store
+.env
+.env.*
+.superpowers/
+*.zip
+*.log
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/

@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
-import { Table, Tag, Button, Modal, Form, Input, message, Space, Upload } from "antd";
+import { Table, Tag, Button, Modal, Form, Input, Select, message, Space, Upload } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import type { UploadProps } from "antd";
 import { api } from "../api/client";
-import type { Vehicle } from "../types";
+import { useAuthStore } from "../store/auth";
+import type { Vehicle, Factory } from "../types";
 import dayjs from "dayjs";
 
 export default function Vehicles() {
+  const { user } = useAuthStore();
+  const isGroupAdmin = user?.role === "group_admin";
+
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [factories, setFactories] = useState<Factory[]>([]);
   const [adding, setAdding] = useState(false);
   const [form] = Form.useForm();
 
@@ -18,14 +23,22 @@ export default function Vehicles() {
 
   useEffect(() => {
     fetchVehicles();
+    if (isGroupAdmin) {
+      api.get("/factories").then(r => setFactories(r.data)).catch(() => {});
+    }
   }, []);
 
   const handleAdd = async (values: Record<string, string>) => {
-    await api.post("/vehicles", values);
-    message.success("车辆已添加");
-    setAdding(false);
-    form.resetFields();
-    fetchVehicles();
+    try {
+      await api.post("/vehicles", values);
+      message.success("车辆已添加");
+      setAdding(false);
+      form.resetFields();
+      fetchVehicles();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      message.error(e.response?.data?.detail || "添加失败");
+    }
   };
 
   const uploadProps: UploadProps = {
@@ -91,10 +104,7 @@ export default function Vehicles() {
   return (
     <div>
       <Space style={{ marginBottom: 16 }}>
-        <Button
-          type="primary"
-          onClick={() => setAdding(true)}
-        >
+        <Button type="primary" onClick={() => setAdding(true)}>
           添加车辆
         </Button>
         <Upload {...uploadProps}>
@@ -109,11 +119,15 @@ export default function Vehicles() {
         onOk={() => form.submit()}
       >
         <Form form={form} onFinish={handleAdd} layout="vertical">
-          <Form.Item
-            name="plate_number"
-            label="车牌号"
-            rules={[{ required: true }]}
-          >
+          {isGroupAdmin && (
+            <Form.Item name="factory_id" label="所属厂区" rules={[{ required: true, message: "请选择厂区" }]}>
+              <Select
+                placeholder="请选择厂区"
+                options={factories.map(f => ({ value: f.id, label: f.name }))}
+              />
+            </Form.Item>
+          )}
+          <Form.Item name="plate_number" label="车牌号" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
           <Form.Item name="vehicle_type" label="车辆类型">

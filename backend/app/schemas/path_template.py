@@ -19,6 +19,7 @@ class PathTemplateStepOut(BaseModel):
 class PathTemplateCreate(BaseModel):
     name: str
     steps: list[PathTemplateStepCreate]
+    factory_id: uuid.UUID | None = None  # group_admin 指定目标厂区
 
 class PathTemplateUpdate(BaseModel):
     name: str | None = None

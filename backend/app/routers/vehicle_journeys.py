@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 from app.database import get_db
 from app.models.vehicle_journey import VehicleJourney, JourneyEvent, JourneyStatus
 from app.models.path_template import PathTemplateStep
@@ -81,28 +81,20 @@ async def record_journey_event(
     is_deviation = False
 
     if journey.template_id:
-        # Count existing events to determine expected step order
-        count_result = await db.execute(
-            select(func.count()).where(JourneyEvent.journey_id == body.journey_id)
+        # Deviation = checkpoint not in template, or direction mismatch
+        steps_result = await db.execute(
+            select(PathTemplateStep).where(PathTemplateStep.template_id == journey.template_id)
         )
-        event_count = count_result.scalar()
-        expected_order = event_count + 1
+        steps = steps_result.scalars().all()
+        # Build map: checkpoint_id -> expected direction
+        template_map = {s.checkpoint_id: s.direction for s in steps}
 
-        step_result = await db.execute(
-            select(PathTemplateStep).where(
-                PathTemplateStep.template_id == journey.template_id,
-                PathTemplateStep.step_order == expected_order,
-            )
-        )
-        expected_step = step_result.scalar_one_or_none()
-
-        if expected_step is None:
-            # Extra event beyond template steps
+        if body.checkpoint_id not in template_map:
             is_deviation = True
-        elif expected_step.checkpoint_id != body.checkpoint_id:
-            is_deviation = True
-        elif expected_step.direction.value != "any" and expected_step.direction.value != body.direction.value:
-            is_deviation = True
+        else:
+            expected_dir = template_map[body.checkpoint_id]
+            if expected_dir.value != "any" and expected_dir.value != body.direction.value:
+                is_deviation = True
 
     event = JourneyEvent(
         journey_id=body.journey_id,

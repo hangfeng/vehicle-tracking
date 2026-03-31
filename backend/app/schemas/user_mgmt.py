@@ -11,6 +11,7 @@ class UserCreate(BaseModel):
     factory_id: uuid.UUID | None = None
 
 class UserUpdate(BaseModel):
+    phone: str | None = None
     name: str | None = None
     role: UserRole | None = None
     factory_id: uuid.UUID | None = None

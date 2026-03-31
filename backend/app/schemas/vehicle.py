@@ -10,6 +10,7 @@ class VehicleCreate(BaseModel):
     contact_name: str | None = None
     contact_phone: str | None = None
     note: str | None = None
+    factory_id: uuid.UUID | None = None  # group_admin 指定目标厂区
 
 class VehicleUpdate(BaseModel):
     vehicle_type: str | None = None

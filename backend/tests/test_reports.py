@@ -4,6 +4,7 @@ from datetime import datetime
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import User
+from app.models.factory import Factory
 from app.models.gate_event import GateEvent, Direction, ReviewStatus
 from app.services.auth import create_access_token
 
@@ -56,3 +57,31 @@ async def test_report_export_excel(client: AsyncClient, operator_user: User):
     )
     assert resp.status_code == 200
     assert "spreadsheet" in resp.headers["content-type"]
+
+
+@pytest.mark.asyncio
+async def test_group_admin_traffic_report_without_factory_filter(
+    client: AsyncClient,
+    admin_user: User,
+    db_session: AsyncSession,
+):
+    token = await get_token(admin_user)
+    factory_id = uuid.uuid4()
+    db_session.add(Factory(id=factory_id, name="测试厂区", timezone="Asia/Shanghai"))
+    db_session.add(GateEvent(
+        id=uuid.uuid4(),
+        factory_id=factory_id,
+        plate_number="粤B88888",
+        direction=Direction.entry,
+        review_status=ReviewStatus.auto_confirmed,
+        captured_at=datetime.utcnow(),
+    ))
+    await db_session.commit()
+
+    resp = await client.get(
+        "/reports/traffic",
+        headers={"Authorization": f"Bearer {token}"},
+        params={"start_date": "2020-01-01", "end_date": "2099-12-31", "granularity": "day"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["total_entries"] >= 1

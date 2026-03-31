@@ -6,6 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 class UserRole(str, enum.Enum):
+    system_admin = "system_admin"
     group_admin = "group_admin"
     factory_manager = "factory_manager"
     operator = "operator"

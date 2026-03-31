@@ -1,6 +1,6 @@
 import uuid
 import io
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -13,15 +13,29 @@ from app.deps import get_current_user, require_roles
 
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
 
+def _resolve_factory_id(user: User, provided: uuid.UUID | None) -> uuid.UUID:
+    if user.role == UserRole.group_admin:
+        if not provided:
+            raise HTTPException(status_code=400, detail="集团管理员需指定 factory_id")
+        return provided
+    return user.factory_id
+
+
 @router.get("", response_model=list[VehicleOut])
 async def list_vehicles(
+    factory_id: uuid.UUID | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    result = await db.execute(
-        select(Vehicle).where(Vehicle.factory_id == user.factory_id)
-    )
+    if user.role == UserRole.group_admin:
+        query = select(Vehicle)
+        if factory_id:
+            query = query.where(Vehicle.factory_id == factory_id)
+    else:
+        query = select(Vehicle).where(Vehicle.factory_id == user.factory_id)
+    result = await db.execute(query)
     return result.scalars().all()
+
 
 @router.post("", response_model=VehicleOut)
 async def create_vehicle(
@@ -29,7 +43,9 @@ async def create_vehicle(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_roles(UserRole.factory_manager, UserRole.group_admin)),
 ):
-    vehicle = Vehicle(**body.model_dump(), factory_id=user.factory_id)
+    fid = _resolve_factory_id(user, body.factory_id)
+    data = body.model_dump(exclude={"factory_id"})
+    vehicle = Vehicle(**data, factory_id=fid)
     db.add(vehicle)
     await db.commit()
     await db.refresh(vehicle)
@@ -43,9 +59,11 @@ class ImportResponse(BaseModel):
 @router.post("/import", response_model=ImportResponse)
 async def import_vehicles(
     file: UploadFile = File(...),
+    factory_id: uuid.UUID | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_roles(UserRole.factory_manager, UserRole.group_admin)),
 ):
+    fid = _resolve_factory_id(user, factory_id)
     content = await file.read()
     try:
         wb = openpyxl.load_workbook(io.BytesIO(content))
@@ -73,7 +91,7 @@ async def import_vehicles(
             continue
 
         existing = await db.execute(
-            select(Vehicle).where(Vehicle.plate_number == plate, Vehicle.factory_id == user.factory_id)
+            select(Vehicle).where(Vehicle.plate_number == plate, Vehicle.factory_id == fid)
         )
         if existing.scalar_one_or_none():
             skipped += 1
@@ -84,7 +102,7 @@ async def import_vehicles(
             company=company,
             contact_name=contact_name,
             contact_phone=contact_phone,
-            factory_id=user.factory_id,
+            factory_id=fid,
         )
         db.add(vehicle)
         created += 1

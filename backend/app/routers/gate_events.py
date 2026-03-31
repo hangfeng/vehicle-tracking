@@ -8,9 +8,9 @@ from sqlalchemy import select, desc
 from app.database import get_db
 from app.models.gate_event import GateEvent, ReviewStatus, Direction
 from app.models.vehicle import Vehicle, VehicleStatus
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas.gate_event import GateEventCreate, GateEventOut, ReviewRequest
-from app.deps import get_current_user, require_roles
+from app.deps import apply_data_scope, get_current_user, get_data_scope, require_roles
 from app.config import settings
 import openpyxl
 import io
@@ -22,12 +22,14 @@ async def list_gate_events(
     plate: str | None = Query(None),
     direction: Direction | None = Query(None),
     review_status: ReviewStatus | None = Query(None),
+    factory_id: uuid.UUID | None = Query(None),
     limit: int = Query(50, le=200),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
+    scope: str | list[uuid.UUID] = Depends(get_data_scope),
 ):
-    q = select(GateEvent).where(GateEvent.factory_id == user.factory_id)
+    q = apply_data_scope(select(GateEvent), GateEvent.factory_id, scope, factory_id)
     if plate:
         q = q.where(GateEvent.plate_number.ilike(f"%{plate}%"))
     if direction:
@@ -42,10 +44,12 @@ async def list_gate_events(
 async def export_gate_events(
     plate: str | None = Query(None),
     direction: str | None = Query(None),
+    factory_id: uuid.UUID | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
+    scope: str | list[uuid.UUID] = Depends(get_data_scope),
 ):
-    q = select(GateEvent).where(GateEvent.factory_id == user.factory_id)
+    q = apply_data_scope(select(GateEvent), GateEvent.factory_id, scope, factory_id)
     if plate:
         q = q.where(GateEvent.plate_number.ilike(f"%{plate}%"))
     if direction:
@@ -168,14 +172,17 @@ async def batch_review_gate_events(
     body: BatchReviewRequest,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_roles(UserRole.operator, UserRole.factory_manager, UserRole.group_admin)),
+    scope: str | list[uuid.UUID] = Depends(get_data_scope),
 ):
-    result = await db.execute(
+    q = apply_data_scope(
         select(GateEvent).where(
             GateEvent.id.in_(body.ids),
-            GateEvent.factory_id == user.factory_id,
             GateEvent.review_status == ReviewStatus.pending_review,
-        )
+        ),
+        GateEvent.factory_id,
+        scope,
     )
+    result = await db.execute(q)
     events = result.scalars().all()
     new_status = ReviewStatus.manually_confirmed if body.action == "confirm" else ReviewStatus.rejected
     for event in events:

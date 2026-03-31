@@ -5,9 +5,10 @@ from app.models.checkpoint import IdentificationMethod
 
 class CheckPointCreate(BaseModel):
     name: str
-    identification_method: IdentificationMethod
+    identification_method: IdentificationMethod = IdentificationMethod.camera
     is_gate: bool = False
     camera_config: dict | None = None
+    factory_id: uuid.UUID | None = None  # group_admin 指定目标厂区
 
 class CheckPointUpdate(BaseModel):
     name: str | None = None

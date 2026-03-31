@@ -1,5 +1,14 @@
 export type UserRole = "group_admin" | "factory_manager" | "operator";
 
+export interface Factory {
+  id: string;
+  name: string;
+  address: string | null;
+  timezone: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 export interface User {
   id: string;
   name: string;
