@@ -21,6 +21,7 @@ class VehicleUpdate(BaseModel):
 
 class VehicleOut(BaseModel):
     id: uuid.UUID
+    serial_no: str | None
     factory_id: uuid.UUID
     plate_number: str
     vehicle_type: str

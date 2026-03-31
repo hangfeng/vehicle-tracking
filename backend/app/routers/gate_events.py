@@ -6,12 +6,16 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from app.database import get_db
+from app.models.checkpoint import CheckPoint
+from app.models.checkpoint_event import CheckpointEvent, CheckpointEventBusinessType, CheckpointEventSource
 from app.models.gate_event import GateEvent, ReviewStatus, Direction
+from app.models.location import Location
 from app.models.vehicle import Vehicle, VehicleStatus
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.gate_event import GateEventCreate, GateEventOut, ReviewRequest
 from app.deps import apply_data_scope, get_current_user, get_data_scope, require_roles
 from app.config import settings
+from app.services.serial_numbers import generate_serial_no
 import openpyxl
 import io
 
@@ -111,12 +115,64 @@ async def create_gate_event(
         )
     )
     vehicle = result.scalar_one_or_none()
-    if vehicle:
-        event.vehicle_id = vehicle.id
-        vehicle.status = VehicleStatus.in_factory if body.direction.value == "entry" else VehicleStatus.out
-        vehicle.last_seen_at = datetime.utcnow()
+    if vehicle is None:
+        vehicle = Vehicle(
+            serial_no=await generate_serial_no(
+                db,
+                model=Vehicle,
+                serial_column=Vehicle.serial_no,
+                module_prefix="VEH",
+            ),
+            factory_id=body.factory_id,
+            plate_number=body.plate_number,
+        )
+        db.add(vehicle)
+        await db.flush()
+
+    event.vehicle_id = vehicle.id
+    vehicle.status = VehicleStatus.in_factory if body.direction.value == "entry" else VehicleStatus.out
+    vehicle.last_seen_at = datetime.utcnow()
 
     db.add(event)
+    await db.flush()
+
+    if body.gate_id is not None:
+        location_result = await db.execute(select(Location).where(Location.id == body.gate_id))
+        location = location_result.scalar_one_or_none()
+        if location is not None:
+            checkpoint_result = await db.execute(
+                select(CheckPoint).where(
+                    CheckPoint.factory_id == body.factory_id,
+                    CheckPoint.name == location.name,
+                    CheckPoint.is_gate == True,
+                )
+            )
+            checkpoint = checkpoint_result.scalar_one_or_none()
+            if checkpoint is not None:
+                vehicle.current_checkpoint_id = checkpoint.id
+                db.add(CheckpointEvent(
+                    serial_no=await generate_serial_no(
+                        db,
+                        model=CheckpointEvent,
+                        serial_column=CheckpointEvent.serial_no,
+                        module_prefix="IO",
+                        at=event.captured_at,
+                    ),
+                    factory_id=body.factory_id,
+                    checkpoint_id=checkpoint.id,
+                    department_id=checkpoint.department_id,
+                    vehicle_id=vehicle.id,
+                    plate_number=body.plate_number,
+                    direction=body.direction,
+                    event_time=event.captured_at,
+                    source=CheckpointEventSource.ai,
+                    business_type=CheckpointEventBusinessType.other,
+                    document_no=None,
+                    entered_by_user_id=None,
+                    note=None,
+                    gate_event_id=event.id,
+                ))
+
     await db.commit()
     await db.refresh(event)
 

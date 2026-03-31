@@ -69,6 +69,12 @@ export default function Vehicles() {
   };
 
   const columns = [
+    {
+      title: "流水号",
+      dataIndex: "serial_no",
+      key: "serial_no",
+      render: (value: string | null) => value || "-",
+    },
     { title: "车牌", dataIndex: "plate_number", key: "plate_number" },
     { title: "类型", dataIndex: "vehicle_type", key: "vehicle_type" },
     {

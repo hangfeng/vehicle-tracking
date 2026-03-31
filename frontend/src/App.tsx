@@ -22,7 +22,7 @@ export default function App() {
 
   useEffect(() => {
     if (token) fetchMe();
-  }, []);
+  }, [token, fetchMe]);
 
   return (
     <BrowserRouter>

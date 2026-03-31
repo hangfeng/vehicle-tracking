@@ -14,6 +14,7 @@ class Vehicle(Base):
     __tablename__ = "vehicles"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    serial_no: Mapped[str | None] = mapped_column(String(32), unique=True, index=True, nullable=True)
     factory_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("factories.id"))
     plate_number: Mapped[str] = mapped_column(String(20), index=True)
     vehicle_type: Mapped[str] = mapped_column(String(50), default="truck")

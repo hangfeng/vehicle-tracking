@@ -1,5 +1,8 @@
 import pytest
+import uuid
 from httpx import AsyncClient
+from app.models.checkpoint import CheckPoint, IdentificationMethod
+from app.models.path_template import PathTemplate, PathTemplateStep, StepDirection
 from app.models.user import User
 from app.services.auth import create_access_token
 
@@ -57,3 +60,59 @@ async def test_operator_cannot_create_checkpoint(client: AsyncClient, operator_u
         "name": "越权节点", "identification_method": "manual", "is_gate": False,
     })
     assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_group_admin_can_list_all_checkpoints_without_factory_filter(
+    client: AsyncClient,
+    admin_user: User,
+    db_session,
+):
+    checkpoint = CheckPoint(
+        id=uuid.uuid4(),
+        factory_id=uuid.uuid4(),
+        name="老节点",
+        identification_method=IdentificationMethod.manual,
+        is_gate=False,
+    )
+    db_session.add(checkpoint)
+    await db_session.commit()
+
+    token = await get_token(admin_user)
+    resp = await client.get("/checkpoints", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200
+    assert any(item["id"] == str(checkpoint.id) for item in resp.json())
+
+
+@pytest.mark.asyncio
+async def test_group_admin_can_list_all_path_templates_without_factory_filter(
+    client: AsyncClient,
+    admin_user: User,
+    db_session,
+):
+    checkpoint = CheckPoint(
+        id=uuid.uuid4(),
+        factory_id=uuid.uuid4(),
+        name="模板节点",
+        identification_method=IdentificationMethod.manual,
+        is_gate=False,
+    )
+    template = PathTemplate(
+        id=uuid.uuid4(),
+        factory_id=checkpoint.factory_id,
+        name="老模板",
+    )
+    step = PathTemplateStep(
+        id=uuid.uuid4(),
+        template_id=template.id,
+        checkpoint_id=checkpoint.id,
+        step_order=1,
+        direction=StepDirection.any,
+    )
+    db_session.add_all([checkpoint, template, step])
+    await db_session.commit()
+
+    token = await get_token(admin_user)
+    resp = await client.get("/path-templates", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200
+    assert any(item["id"] == str(template.id) for item in resp.json())

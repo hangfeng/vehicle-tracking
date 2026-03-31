@@ -6,7 +6,7 @@ import {
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import { api } from "../api/client";
 import { useAuthStore } from "../store/auth";
-import type { CheckPoint, PathTemplate, Factory } from "../types";
+import type { CheckPoint, PathTemplate, Factory, Department } from "../types";
 
 // ─── 厂区选择器（集团管理员用） ───────────────────────────────────────────
 
@@ -147,16 +147,97 @@ function FactorySettings() {
 
 // ─── 节点管理 ────────────────────────────────────────────────────────────
 
+function DepartmentSettings({ factoryId }: { factoryId: string | null }) {
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<Department | null>(null);
+  const [form] = Form.useForm();
+
+  const fetchDepartments = async () => {
+    const params = factoryId ? { factory_id: factoryId } : {};
+    const resp = await api.get("/departments", { params });
+    setDepartments(resp.data);
+  };
+
+  useEffect(() => {
+    if (factoryId !== undefined) fetchDepartments();
+  }, [factoryId]);
+
+  const openCreate = () => { setEditing(null); form.resetFields(); setModalOpen(true); };
+  const openEdit = (department: Department) => {
+    setEditing(department);
+    form.setFieldsValue({ name: department.name, is_active: department.is_active });
+    setModalOpen(true);
+  };
+
+  const handleSubmit = async () => {
+    const values = await form.validateFields();
+    try {
+      if (editing) {
+        await api.patch(`/departments/${editing.id}`, values);
+      } else {
+        await api.post("/departments", factoryId ? { ...values, factory_id: factoryId } : values);
+      }
+      message.success(editing ? "更新成功" : "创建成功");
+      setModalOpen(false);
+      fetchDepartments();
+    } catch {
+      message.error("操作失败");
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate} disabled={!factoryId}>
+          新增部门
+        </Button>
+      </div>
+      <Table
+        dataSource={departments}
+        rowKey="id"
+        columns={[
+          { title: "部门名称", dataIndex: "name" },
+          { title: "状态", dataIndex: "is_active", render: (v: boolean) => <Tag color={v ? "green" : "red"}>{v ? "启用" : "停用"}</Tag> },
+          { title: "操作", render: (_: unknown, row: Department) => <Button type="link" onClick={() => openEdit(row)}>编辑</Button> },
+        ]}
+      />
+      <Modal
+        title={editing ? "编辑部门" : "新增部门"}
+        open={modalOpen}
+        onOk={handleSubmit}
+        onCancel={() => setModalOpen(false)}
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item name="name" label="部门名称" rules={[{ required: true, message: "请输入部门名称" }]}>
+            <Input />
+          </Form.Item>
+          {editing && (
+            <Form.Item name="is_active" label="状态" valuePropName="checked">
+              <Switch checkedChildren="启用" unCheckedChildren="停用" />
+            </Form.Item>
+          )}
+        </Form>
+      </Modal>
+    </div>
+  );
+}
+
 function CheckpointSettings({ factoryId }: { factoryId: string | null }) {
   const [checkpoints, setCheckpoints] = useState<CheckPoint[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<CheckPoint | null>(null);
   const [form] = Form.useForm();
 
   const fetchCheckpoints = async () => {
     const params = factoryId ? { factory_id: factoryId } : {};
-    const resp = await api.get("/checkpoints", { params });
-    setCheckpoints(resp.data);
+    const [checkpointResp, departmentResp] = await Promise.all([
+      api.get("/checkpoints", { params }),
+      api.get("/departments", { params }),
+    ]);
+    setCheckpoints(checkpointResp.data);
+    setDepartments(departmentResp.data);
   };
 
   useEffect(() => {
@@ -166,7 +247,7 @@ function CheckpointSettings({ factoryId }: { factoryId: string | null }) {
   const openCreate = () => { setEditing(null); form.resetFields(); setModalOpen(true); };
   const openEdit = (cp: CheckPoint) => {
     setEditing(cp);
-    form.setFieldsValue({ name: cp.name, is_gate: cp.is_gate });
+    form.setFieldsValue({ name: cp.name, is_gate: cp.is_gate, department_id: cp.department_id });
     setModalOpen(true);
   };
 
@@ -200,6 +281,11 @@ function CheckpointSettings({ factoryId }: { factoryId: string | null }) {
 
   const columns = [
     { title: "节点名称", dataIndex: "name" },
+    {
+      title: "所属部门",
+      dataIndex: "department_id",
+      render: (value: string | null) => departments.find((item) => item.id === value)?.name || "—",
+    },
     {
       title: "类型",
       dataIndex: "is_gate",
@@ -240,6 +326,13 @@ function CheckpointSettings({ factoryId }: { factoryId: string | null }) {
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="节点名称" rules={[{ required: true, message: "请输入节点名称" }]}>
             <Input placeholder="如：厂区大门、1号仓库、2号仓库" />
+          </Form.Item>
+          <Form.Item name="department_id" label="所属部门">
+            <Select
+              allowClear
+              placeholder="可选，未设置时沿用当前默认权限"
+              options={departments.map((item) => ({ value: item.id, label: item.name }))}
+            />
           </Form.Item>
           <Form.Item name="is_gate" label="是否大门节点" valuePropName="checked">
             <Switch checkedChildren="大门" unCheckedChildren="内部" />
@@ -419,20 +512,37 @@ function TemplateSettings({ factoryId }: { factoryId: string | null }) {
 
 export default function Settings() {
   const { user } = useAuthStore();
-  const isGroupAdmin = user?.role === "group_admin";
+  const canChooseFactory = user?.role === "group_admin" || user?.role === "system_admin";
   const [selectedFactory, setSelectedFactory] = useState<string | null>(null);
 
-  // factory_manager 使用自己的 factory_id；group_admin 使用选择的厂区
-  const factoryId = isGroupAdmin ? selectedFactory : (user?.factory_id ?? null);
+  // factory_manager 使用自己的 factory_id；group/system admin 使用选择的厂区
+  const factoryId = canChooseFactory ? selectedFactory : (user?.factory_id ?? null);
 
   const tabs = [
-    ...(isGroupAdmin ? [{ key: "factories", label: "厂区管理", children: <FactorySettings /> }] : []),
+    ...(user?.role === "group_admin" ? [{ key: "factories", label: "厂区管理", children: <FactorySettings /> }] : []),
+    {
+      key: "departments",
+      label: "部门管理",
+      children: (
+        <div>
+          {canChooseFactory && (
+            <>
+              <FactorySelector value={selectedFactory} onChange={setSelectedFactory} />
+              {!selectedFactory && (
+                <Alert message="请先选择厂区" type="info" showIcon style={{ marginBottom: 16 }} />
+              )}
+            </>
+          )}
+          <DepartmentSettings factoryId={factoryId} />
+        </div>
+      ),
+    },
     {
       key: "checkpoints",
       label: "节点管理",
       children: (
         <div>
-          {isGroupAdmin && (
+          {canChooseFactory && (
             <>
               <FactorySelector value={selectedFactory} onChange={setSelectedFactory} />
               {!selectedFactory && (
@@ -449,7 +559,7 @@ export default function Settings() {
       label: "路径模板",
       children: (
         <div>
-          {isGroupAdmin && (
+          {canChooseFactory && (
             <>
               <FactorySelector value={selectedFactory} onChange={setSelectedFactory} />
               {!selectedFactory && (

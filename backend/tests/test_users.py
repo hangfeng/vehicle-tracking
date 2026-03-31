@@ -50,6 +50,7 @@ async def test_admin_can_create_manager(client: AsyncClient, admin_user: User, d
     })
     assert resp.status_code == 201
     assert resp.json()["role"] == "factory_manager"
+    assert resp.json()["serial_no"].startswith("USR")
 
 @pytest.mark.asyncio
 async def test_manager_cannot_create_admin(client: AsyncClient, manager_user: User):

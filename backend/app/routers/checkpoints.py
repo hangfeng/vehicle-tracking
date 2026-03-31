@@ -6,7 +6,7 @@ from app.database import get_db
 from app.models.checkpoint import CheckPoint
 from app.models.user import User, UserRole
 from app.schemas.checkpoint import CheckPointCreate, CheckPointUpdate, CheckPointOut
-from app.deps import get_current_user, require_roles
+from app.deps import apply_data_scope, get_current_user, get_data_scope, require_roles
 
 router = APIRouter(prefix="/checkpoints", tags=["checkpoints"])
 
@@ -25,11 +25,10 @@ async def list_checkpoints(
     factory_id: uuid.UUID | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
+    scope: str | list[uuid.UUID] = Depends(get_data_scope),
 ):
-    fid = _resolve_factory_id(user, factory_id)
-    result = await db.execute(
-        select(CheckPoint).where(CheckPoint.factory_id == fid)
-    )
+    query = apply_data_scope(select(CheckPoint), CheckPoint.factory_id, scope, factory_id)
+    result = await db.execute(query)
     return result.scalars().all()
 
 

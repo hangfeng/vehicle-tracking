@@ -14,6 +14,7 @@ class CheckPoint(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     factory_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("factories.id"))
+    department_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("departments.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(100))
     identification_method: Mapped[IdentificationMethod] = mapped_column(SAEnum(IdentificationMethod))
     is_gate: Mapped[bool] = mapped_column(Boolean, default=False)

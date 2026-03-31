@@ -9,20 +9,24 @@ class UserCreate(BaseModel):
     password: str
     role: UserRole
     factory_id: uuid.UUID | None = None
+    department_id: uuid.UUID | None = None
 
 class UserUpdate(BaseModel):
     phone: str | None = None
     name: str | None = None
     role: UserRole | None = None
     factory_id: uuid.UUID | None = None
+    department_id: uuid.UUID | None = None
     is_active: bool | None = None
 
 class UserOut(BaseModel):
     id: uuid.UUID
+    serial_no: str | None
     phone: str
     name: str
     role: UserRole
     factory_id: uuid.UUID | None
+    department_id: uuid.UUID | None
     is_active: bool
     created_at: datetime
 

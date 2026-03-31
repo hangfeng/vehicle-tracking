@@ -1,4 +1,4 @@
-export type UserRole = "group_admin" | "factory_manager" | "operator";
+export type UserRole = "system_admin" | "group_admin" | "factory_manager" | "operator";
 
 export interface Factory {
   id: string;
@@ -9,12 +9,22 @@ export interface Factory {
   created_at: string;
 }
 
+export interface Department {
+  id: string;
+  factory_id: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 export interface User {
   id: string;
+  serial_no: string | null;
   name: string;
   phone: string;
   role: UserRole;
   factory_id: string | null;
+  department_id: string | null;
   is_active: boolean;
   created_at: string;
 }
@@ -27,6 +37,8 @@ export type AlertStatus = "active" | "resolved";
 export type IdentificationMethod = "camera" | "manual";
 export type JourneyStatus = "active" | "completed" | "deviated";
 export type JourneyDirection = "entry" | "exit";
+export type CheckpointEventSource = "manual" | "ai" | "import";
+export type CheckpointEventBusinessType = "delivery" | "shipment" | "other";
 
 export interface GateEvent {
   id: string;
@@ -42,6 +54,7 @@ export interface GateEvent {
 
 export interface Vehicle {
   id: string;
+  serial_no: string | null;
   factory_id: string;
   plate_number: string;
   vehicle_type: string;
@@ -75,14 +88,49 @@ export interface DashboardStats {
   active_alerts_count: number;
 }
 
+export interface DashboardRecentAccessRecord {
+  record_no: string;
+  plate_number: string;
+  entry_time: string | null;
+  exit_time: string | null;
+  stay_duration_minutes: number | null;
+  status: "completed" | "in_factory" | "exit_only";
+  path_nodes: Array<{
+    checkpoint_id: string;
+    checkpoint_name: string;
+    event_time: string;
+  }>;
+}
+
 export interface CheckPoint {
   id: string;
   factory_id: string;
+  department_id: string | null;
   name: string;
   identification_method: IdentificationMethod;
   is_gate: boolean;
   camera_config: Record<string, unknown> | null;
   is_active: boolean;
+  created_at: string;
+}
+
+export interface CheckpointEvent {
+  id: string;
+  serial_no: string | null;
+  factory_id: string;
+  checkpoint_id: string;
+  department_id: string | null;
+  vehicle_id: string | null;
+  plate_number: string;
+  direction: Direction;
+  event_time: string;
+  source: CheckpointEventSource;
+  business_type: CheckpointEventBusinessType;
+  document_no: string | null;
+  entered_by_user_id: string | null;
+  entered_by_user_name: string | null;
+  note: string | null;
+  gate_event_id: string | null;
   created_at: string;
 }
 

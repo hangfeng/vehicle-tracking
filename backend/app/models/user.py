@@ -15,7 +15,9 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    serial_no: Mapped[str | None] = mapped_column(String(32), unique=True, index=True, nullable=True)
     factory_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("factories.id"), nullable=True)
+    department_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("departments.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(100))
     phone: Mapped[str] = mapped_column(String(20), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(256))

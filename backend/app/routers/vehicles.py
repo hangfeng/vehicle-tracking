@@ -6,10 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import openpyxl
 from app.database import get_db
-from app.models.vehicle import Vehicle
+from app.models.vehicle import Vehicle, VehicleStatus
 from app.models.user import User, UserRole
 from app.schemas.vehicle import VehicleCreate, VehicleUpdate, VehicleOut
 from app.deps import get_current_user, require_roles
+from app.services.serial_numbers import generate_serial_no
 
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
 
@@ -37,6 +38,25 @@ async def list_vehicles(
     return result.scalars().all()
 
 
+@router.get("/in-factory-candidates", response_model=list[VehicleOut])
+async def list_in_factory_candidates(
+    factory_id: uuid.UUID | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if user.role == UserRole.group_admin:
+        query = select(Vehicle).where(Vehicle.status == VehicleStatus.in_factory)
+        if factory_id:
+            query = query.where(Vehicle.factory_id == factory_id)
+    else:
+        query = select(Vehicle).where(
+            Vehicle.factory_id == user.factory_id,
+            Vehicle.status == VehicleStatus.in_factory,
+        )
+    result = await db.execute(query.order_by(Vehicle.last_seen_at.desc().nullslast(), Vehicle.created_at.desc()))
+    return result.scalars().all()
+
+
 @router.post("", response_model=VehicleOut)
 async def create_vehicle(
     body: VehicleCreate,
@@ -45,7 +65,16 @@ async def create_vehicle(
 ):
     fid = _resolve_factory_id(user, body.factory_id)
     data = body.model_dump(exclude={"factory_id"})
-    vehicle = Vehicle(**data, factory_id=fid)
+    vehicle = Vehicle(
+        **data,
+        factory_id=fid,
+        serial_no=await generate_serial_no(
+            db,
+            model=Vehicle,
+            serial_column=Vehicle.serial_no,
+            module_prefix="VEH",
+        ),
+    )
     db.add(vehicle)
     await db.commit()
     await db.refresh(vehicle)
@@ -98,6 +127,12 @@ async def import_vehicles(
             continue
 
         vehicle = Vehicle(
+            serial_no=await generate_serial_no(
+                db,
+                model=Vehicle,
+                serial_column=Vehicle.serial_no,
+                module_prefix="VEH",
+            ),
             plate_number=plate,
             company=company,
             contact_name=contact_name,
@@ -105,6 +140,7 @@ async def import_vehicles(
             factory_id=fid,
         )
         db.add(vehicle)
+        await db.flush()
         created += 1
 
     await db.commit()

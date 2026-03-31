@@ -13,24 +13,38 @@ import { useAuthStore } from "../store/auth";
 
 const { Sider, Content, Header } = Layout;
 
+const roleLabels = {
+  system_admin: "系统管理员",
+  group_admin: "集团管理员",
+  factory_manager: "厂区管理员",
+  operator: "操作员",
+} as const;
+
 export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuthStore();
+  const { user, tokenRole, authError, logout } = useAuthStore();
+  const effectiveRole = user?.role ?? tokenRole;
 
   const allItems = [
-    { key: "/", icon: <DashboardOutlined />, label: "实时看板", roles: ["group_admin", "factory_manager", "operator"] },
-    { key: "/gate-events", icon: <SwapOutlined />, label: "出入记录", roles: ["group_admin", "factory_manager", "operator"] },
-    { key: "/vehicles", icon: <CarOutlined />, label: "车辆管理", roles: ["group_admin", "factory_manager", "operator"] },
-    { key: "/alerts", icon: <AlertOutlined />, label: "报警中心", roles: ["group_admin", "factory_manager", "operator"] },
+    { key: "/", icon: <DashboardOutlined />, label: "实时看板", roles: ["system_admin", "group_admin", "factory_manager", "operator"] },
+    { key: "/gate-events", icon: <SwapOutlined />, label: "出入管理", roles: ["system_admin", "group_admin", "factory_manager", "operator"] },
+    { key: "/vehicles", icon: <CarOutlined />, label: "车辆管理", roles: ["system_admin", "group_admin", "factory_manager", "operator"] },
+    { key: "/alerts", icon: <AlertOutlined />, label: "报警中心", roles: ["system_admin", "group_admin", "factory_manager", "operator"] },
     { key: "/users", icon: <UserOutlined />, label: "用户管理", roles: ["group_admin", "factory_manager"] },
-    { key: "/reports", icon: <BarChartOutlined />, label: "报表中心", roles: ["group_admin", "factory_manager", "operator"] },
-    { key: "/settings", icon: <SettingOutlined />, label: "系统设置", roles: ["group_admin", "factory_manager"] },
+    { key: "/reports", icon: <BarChartOutlined />, label: "报表中心", roles: ["system_admin", "group_admin", "factory_manager", "operator"] },
+    { key: "/settings", icon: <SettingOutlined />, label: "系统设置", roles: ["system_admin", "group_admin", "factory_manager"] },
   ];
 
   const menuItems = allItems
-    .filter(item => !user || item.roles.includes(user.role))
+    .filter(item => !effectiveRole || item.roles.includes(effectiveRole))
     .map(({ key, icon, label }) => ({ key, icon, label }));
+
+  const identityText = user
+    ? `${user.name} · ${roleLabels[user.role]}`
+    : effectiveRole
+      ? `当前用户信息未同步 · ${roleLabels[effectiveRole]}`
+      : "未识别登录身份";
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -56,7 +70,8 @@ export default function AppLayout() {
           borderBottom: "1px solid #f0f0f0",
         }}>
           <span style={{ color: "#475569" }}>
-            {user?.name} · {user?.role}
+            {identityText}
+            {authError ? "（用户资料同步失败）" : ""}
           </span>
           <span
             style={{ cursor: "pointer", color: "#6b7280" }}

@@ -2,7 +2,7 @@ import uuid
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import false
+from sqlalchemy import select, false
 from sqlalchemy.sql import Select
 from app.database import get_db
 from app.models.user import User, UserRole
@@ -30,7 +30,7 @@ async def get_current_user(
 
 async def get_data_scope(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    _: AsyncSession = Depends(get_db),
 ) -> str | list[uuid.UUID]:
     if user.role == UserRole.system_admin:
         return "ALL"

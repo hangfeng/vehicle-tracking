@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from app.main import app
 from app.database import Base, get_db
 from app.models.user import User, UserRole
-from app.models import factory, vehicle, location, gate_event, alert, checkpoint, path_template, vehicle_journey  # noqa: F401
+from app.models import factory, vehicle, location, gate_event, alert, checkpoint, path_template, vehicle_journey, department, checkpoint_event  # noqa: F401
 from app.services.auth import hash_password
 import uuid
 

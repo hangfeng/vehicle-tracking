@@ -7,6 +7,7 @@ from app.models.user import User, UserRole
 from app.schemas.user_mgmt import UserCreate, UserUpdate, UserOut, BatchStatusRequest, BatchStatusResponse
 from app.deps import get_current_user, require_roles
 from app.services.auth import hash_password
+from app.services.serial_numbers import generate_serial_no
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -17,6 +18,21 @@ def _can_manage_role(actor: User, target_role: UserRole) -> bool:
     if actor.role == UserRole.factory_manager:
         return target_role == UserRole.operator
     return False
+
+
+def _validate_role_factory_assignment(role: UserRole, factory_id: uuid.UUID | None) -> None:
+    if role == UserRole.group_admin and factory_id is not None:
+        raise HTTPException(status_code=400, detail="集团管理员不能绑定所属厂区")
+    if role in (UserRole.factory_manager, UserRole.operator) and factory_id is None:
+        raise HTTPException(status_code=400, detail="厂区管理员和操作员必须选择所属厂区")
+
+
+def _validate_role_department_assignment(
+    role: UserRole,
+    department_id: uuid.UUID | None,
+) -> None:
+    if role == UserRole.group_admin and department_id is not None:
+        raise HTTPException(status_code=400, detail="集团管理员不能绑定所属部门")
 
 @router.get("", response_model=list[UserOut])
 async def list_users(
@@ -42,17 +58,26 @@ async def create_user(
 ):
     if not _can_manage_role(actor, body.role):
         raise HTTPException(status_code=403, detail="Cannot create user with this role")
+    _validate_role_factory_assignment(body.role, body.factory_id)
+    _validate_role_department_assignment(body.role, body.department_id)
     if actor.role == UserRole.factory_manager and body.factory_id != actor.factory_id:
         raise HTTPException(status_code=403, detail="Can only create users in your own factory")
     existing = await db.execute(select(User).where(User.phone == body.phone))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Phone already exists")
     new_user = User(
+        serial_no=await generate_serial_no(
+            db,
+            model=User,
+            serial_column=User.serial_no,
+            module_prefix="USR",
+        ),
         phone=body.phone,
         name=body.name,
         password_hash=hash_password(body.password),
         role=body.role,
         factory_id=body.factory_id,
+        department_id=body.department_id,
     )
     db.add(new_user)
     await db.commit()
@@ -91,6 +116,11 @@ async def update_user(
     # Check new role assignment is also permitted (prevent privilege escalation)
     if body.role is not None and not _can_manage_role(actor, body.role):
         raise HTTPException(status_code=403, detail="Cannot assign this role")
+    next_role = body.role if body.role is not None else target.role
+    next_factory_id = body.factory_id if body.factory_id is not None else target.factory_id
+    next_department_id = body.department_id if body.department_id is not None else target.department_id
+    _validate_role_factory_assignment(next_role, next_factory_id)
+    _validate_role_department_assignment(next_role, next_department_id)
     for k, v in body.model_dump(exclude_none=True).items():
         setattr(target, k, v)
     await db.commit()

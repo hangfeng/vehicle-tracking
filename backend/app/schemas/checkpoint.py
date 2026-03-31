@@ -9,17 +9,20 @@ class CheckPointCreate(BaseModel):
     is_gate: bool = False
     camera_config: dict | None = None
     factory_id: uuid.UUID | None = None  # group_admin 指定目标厂区
+    department_id: uuid.UUID | None = None
 
 class CheckPointUpdate(BaseModel):
     name: str | None = None
     identification_method: IdentificationMethod | None = None
     is_gate: bool | None = None
     camera_config: dict | None = None
+    department_id: uuid.UUID | None = None
     is_active: bool | None = None
 
 class CheckPointOut(BaseModel):
     id: uuid.UUID
     factory_id: uuid.UUID
+    department_id: uuid.UUID | None
     name: str
     identification_method: IdentificationMethod
     is_gate: bool
