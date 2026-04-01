@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Table, Button, Tag, Drawer, Form, Input, Select, Space, Switch,
-  Popconfirm, Typography, message,
+  Popconfirm, Typography, message, Modal,
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { api } from "../api/client";
@@ -25,6 +25,7 @@ const roleColors: Record<UserRole, string> = {
 export default function Users() {
   const { user: me, tokenRole } = useAuthStore();
   const effectiveRole = me?.role ?? tokenRole;
+  const isSuper = effectiveRole === "system_admin" || effectiveRole === "group_admin";
   const [users, setUsers] = useState<User[]>([]);
   const [factories, setFactories] = useState<Factory[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -32,11 +33,14 @@ export default function Users() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [form] = Form.useForm();
-  const selectedRole = Form.useWatch("role", form);
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetTargetId, setResetTargetId] = useState<string | null>(null);
+  const [resetForm] = Form.useForm();
+  const [formRole, setFormRole] = useState<UserRole | undefined>(undefined);
   const selectedFactoryId = Form.useWatch("factory_id", form);
   const effectiveFactoryId = selectedFactoryId ?? me?.factory_id ?? editingUser?.factory_id ?? null;
-  const shouldSelectFactory = effectiveRole === "group_admin" && selectedRole && selectedRole !== "group_admin";
-  const shouldSelectDepartment = selectedRole && selectedRole !== "group_admin";
+  const shouldSelectFactory = isSuper && formRole && formRole !== "group_admin" && formRole !== "system_admin";
+  const shouldSelectDepartment = formRole && formRole !== "group_admin" && formRole !== "system_admin";
 
   const fetchUsers = async () => {
     const resp = await api.get("/users");
@@ -45,7 +49,7 @@ export default function Users() {
 
   useEffect(() => {
     fetchUsers();
-    if (effectiveRole === "group_admin") {
+    if (isSuper) {
       api.get("/factories").then(r => setFactories(r.data)).catch(() => {});
     }
     api.get("/departments").then(r => setDepartments(r.data)).catch(() => {});
@@ -55,25 +59,29 @@ export default function Users() {
     setEditingUser(null);
     form.resetFields();
     if (effectiveRole === "factory_manager" && me?.factory_id) {
+      setFormRole("operator");
       form.setFieldsValue({
         role: "operator",
         factory_id: me.factory_id,
         department_id: undefined,
         is_active: true,
       });
-    }
-    if (effectiveRole === "group_admin") {
-      form.setFieldsValue({
-        factory_id: undefined,
-        department_id: undefined,
-        is_active: true,
-      });
+    } else {
+      setFormRole(undefined);
+      if (isSuper) {
+        form.setFieldsValue({
+          factory_id: undefined,
+          department_id: undefined,
+          is_active: true,
+        });
+      }
     }
     setDrawerOpen(true);
   };
 
   const openEdit = (u: User) => {
     setEditingUser(u);
+    setFormRole(u.role);
     form.setFieldsValue({
       phone: u.phone,
       name: u.name,
@@ -103,6 +111,24 @@ export default function Users() {
     }
   };
 
+  const openResetPassword = (userId: string) => {
+    setResetTargetId(userId);
+    resetForm.resetFields();
+    setResetModalOpen(true);
+  };
+
+  const handleResetPassword = async () => {
+    const values = await resetForm.validateFields();
+    try {
+      await api.post(`/users/${resetTargetId}/reset-password`, { new_password: values.new_password });
+      message.success("密码已重置");
+      setResetModalOpen(false);
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } } };
+      message.error(error.response?.data?.detail || "重置失败");
+    }
+  };
+
   const handleBatchStatus = async (is_active: boolean) => {
     const resp = await api.post("/users/batch-status", { ids: selectedIds, is_active });
     message.success(`已${is_active ? "启用" : "停用"} ${resp.data.updated} 个用户`);
@@ -110,9 +136,11 @@ export default function Users() {
     fetchUsers();
   };
 
-  const availableRoles: UserRole[] = effectiveRole === "group_admin"
-    ? ["group_admin", "factory_manager", "operator"]
-    : ["operator"];
+  const availableRoles: UserRole[] = effectiveRole === "system_admin"
+    ? ["system_admin", "group_admin", "factory_manager", "operator"]
+    : effectiveRole === "group_admin"
+      ? ["group_admin", "factory_manager", "operator"]
+      : ["operator"];
   const departmentOptions = departments
     .filter((item) => !effectiveFactoryId || item.factory_id === effectiveFactoryId)
     .map((item) => ({ value: item.id, label: item.name }));
@@ -125,14 +153,14 @@ export default function Users() {
   }, [departmentOptions, form]);
 
   useEffect(() => {
-    if (selectedRole === "group_admin") {
+    if (formRole === "group_admin" || formRole === "system_admin") {
       form.setFieldsValue({ factory_id: undefined, department_id: undefined });
       return;
     }
     if (effectiveRole === "factory_manager" && me?.factory_id) {
       form.setFieldValue("factory_id", me.factory_id);
     }
-  }, [effectiveRole, form, me?.factory_id, selectedRole]);
+  }, [effectiveRole, form, me?.factory_id, formRole]);
 
   const columns = [
     { title: "流水号", dataIndex: "serial_no", key: "serial_no", render: (value: string | null) => value || "—" },
@@ -166,7 +194,12 @@ export default function Users() {
       title: "操作",
       key: "action",
       render: (_: unknown, record: User) => (
-        <Button type="link" onClick={() => openEdit(record)}>编辑</Button>
+        <Space>
+          <Button type="link" onClick={() => openEdit(record)}>编辑</Button>
+          {isSuper && (
+            <Button type="link" onClick={() => openResetPassword(record.id)}>重置密码</Button>
+          )}
+        </Space>
       ),
     },
   ];
@@ -200,6 +233,24 @@ export default function Users() {
         }}
       />
 
+      <Modal
+        title="重置密码"
+        open={resetModalOpen}
+        onOk={handleResetPassword}
+        onCancel={() => setResetModalOpen(false)}
+        okText="确认重置"
+      >
+        <Form form={resetForm} layout="vertical">
+          <Form.Item
+            name="new_password"
+            label="新密码"
+            rules={[{ required: true, min: 6, message: "密码至少6位" }]}
+          >
+            <Input.Password placeholder="请输入新密码" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
       <Drawer
         title={editingUser ? "编辑用户" : "新建用户"}
         open={drawerOpen}
@@ -208,7 +259,9 @@ export default function Users() {
           <Button type="primary" onClick={handleSubmit} block>保存</Button>
         }
       >
-        <Form form={form} layout="vertical">
+        <Form form={form} layout="vertical" onValuesChange={(changed) => {
+          if ("role" in changed) setFormRole(changed.role as UserRole | undefined);
+        }}>
           <Form.Item name="phone" label="手机号" rules={[{ required: true }]}>
             <Input />
           </Form.Item>

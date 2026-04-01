@@ -14,9 +14,9 @@ router = APIRouter(prefix="/departments", tags=["departments"])
 
 
 def _resolve_factory_id(user: User, provided: uuid.UUID | None) -> uuid.UUID:
-    if user.role == UserRole.group_admin:
+    if user.role in (UserRole.system_admin, UserRole.group_admin):
         if not provided:
-            raise HTTPException(status_code=400, detail="集团管理员需指定 factory_id")
+            raise HTTPException(status_code=400, detail="需指定 factory_id")
         return provided
     if user.factory_id is None:
         raise HTTPException(status_code=400, detail="当前用户未绑定厂区")
@@ -30,7 +30,7 @@ async def list_departments(
     user: User = Depends(get_current_user),
 ):
     query = select(Department)
-    if user.role == UserRole.group_admin:
+    if user.role in (UserRole.system_admin, UserRole.group_admin):
         if factory_id is not None:
             query = query.where(Department.factory_id == factory_id)
     else:
@@ -63,7 +63,7 @@ async def update_department(
     user: User = Depends(require_roles(UserRole.group_admin, UserRole.factory_manager)),
 ):
     query = select(Department).where(Department.id == department_id)
-    if user.role != UserRole.group_admin:
+    if user.role not in (UserRole.system_admin, UserRole.group_admin):
         query = query.where(Department.factory_id == user.factory_id)
     result = await db.execute(query)
     department = result.scalar_one_or_none()

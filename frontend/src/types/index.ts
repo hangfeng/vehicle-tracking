@@ -179,3 +179,17 @@ export interface AlertReport {
   total_resolved: number;
   by_type: Array<{ type: string; count: number }>;
 }
+
+export interface AccessDetailRow {
+  serial_no: string | null;
+  event_time: string;
+  plate_number: string;
+  direction: Direction;
+  checkpoint_name: string;
+  department_name: string | null;
+  business_type: CheckpointEventBusinessType;
+  document_no: string | null;
+  source: CheckpointEventSource;
+  entered_by_user_name: string | null;
+  note: string | null;
+}

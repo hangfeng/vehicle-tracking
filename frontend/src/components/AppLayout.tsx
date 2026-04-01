@@ -31,7 +31,7 @@ export default function AppLayout() {
     { key: "/gate-events", icon: <SwapOutlined />, label: "出入管理", roles: ["system_admin", "group_admin", "factory_manager", "operator"] },
     { key: "/vehicles", icon: <CarOutlined />, label: "车辆管理", roles: ["system_admin", "group_admin", "factory_manager", "operator"] },
     { key: "/alerts", icon: <AlertOutlined />, label: "报警中心", roles: ["system_admin", "group_admin", "factory_manager", "operator"] },
-    { key: "/users", icon: <UserOutlined />, label: "用户管理", roles: ["group_admin", "factory_manager"] },
+    { key: "/users", icon: <UserOutlined />, label: "用户管理", roles: ["system_admin", "group_admin", "factory_manager"] },
     { key: "/reports", icon: <BarChartOutlined />, label: "报表中心", roles: ["system_admin", "group_admin", "factory_manager", "operator"] },
     { key: "/settings", icon: <SettingOutlined />, label: "系统设置", roles: ["system_admin", "group_admin", "factory_manager"] },
   ];

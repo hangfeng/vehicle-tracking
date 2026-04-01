@@ -13,7 +13,8 @@ import {
   message,
 } from "antd";
 import { api } from "../api/client";
-import type { CheckPoint, CheckpointEvent, Department, Vehicle } from "../types";
+import { useAuthStore } from "../store/auth";
+import type { CheckPoint, CheckpointEvent, Department, Factory, Vehicle } from "../types";
 import dayjs from "dayjs";
 
 const sourceLabels: Record<string, string> = {
@@ -23,9 +24,11 @@ const sourceLabels: Record<string, string> = {
 };
 
 export default function GateEvents() {
+  const { user: me } = useAuthStore();
   const [events, setEvents] = useState<CheckpointEvent[]>([]);
   const [checkpoints, setCheckpoints] = useState<CheckPoint[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [myFactory, setMyFactory] = useState<Factory | null>(null);
   const [inFactoryVehicles, setInFactoryVehicles] = useState<Vehicle[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [filterPlate, setFilterPlate] = useState("");
@@ -61,7 +64,10 @@ export default function GateEvents() {
   useEffect(() => {
     fetchMeta().catch(() => {});
     fetchInFactoryVehicles().catch(() => {});
-  }, []);
+    if (me?.factory_id) {
+      api.get<Factory>(`/factories/${me.factory_id}`).then(r => setMyFactory(r.data)).catch(() => {});
+    }
+  }, [me?.factory_id]);
 
   useEffect(() => {
     fetchEvents().catch(() => {});
@@ -73,6 +79,13 @@ export default function GateEvents() {
     value: item.plate_number,
     label: `${item.plate_number} · ${item.company || "未登记"}`,
   }));
+
+  // Operators can only record checkpoints belonging to their department;
+  // factory_manager and above can record any checkpoint.
+  const accessibleCheckpoints = me?.role === "operator" && me?.department_id
+    ? checkpoints.filter(cp => cp.department_id === me.department_id)
+    : checkpoints;
+  const myDepartment = me?.department_id ? departments.find(d => d.id === me.department_id) : null;
 
   const handleCreate = async () => {
     const values = await form.validateFields();
@@ -195,10 +208,23 @@ export default function GateEvents() {
         }}
       >
         <Form form={form} layout="vertical">
+          <Form.Item label="操作员">
+            <span>{me?.name || "—"}</span>
+          </Form.Item>
+          {myFactory && (
+            <Form.Item label="所属厂区">
+              <span>{myFactory.name}</span>
+            </Form.Item>
+          )}
+          {myDepartment && (
+            <Form.Item label="所属部门">
+              <span>{myDepartment.name}</span>
+            </Form.Item>
+          )}
           <Form.Item name="checkpoint_id" label="节点" rules={[{ required: true, message: "请选择节点" }]}>
             <Select
               placeholder="请选择节点"
-              options={checkpoints.map((item) => ({ value: item.id, label: item.name }))}
+              options={accessibleCheckpoints.map((item) => ({ value: item.id, label: item.name }))}
             />
           </Form.Item>
           <Form.Item name="direction" label="方向" rules={[{ required: true, message: "请选择方向" }]}>

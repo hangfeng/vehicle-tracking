@@ -14,7 +14,7 @@ from app.models.user import User, UserRole
 from app.models.vehicle import Vehicle
 from app.models.vehicle_journey import VehicleJourney
 from app.schemas.factory import FactoryCreate, FactoryUpdate, FactoryOut
-from app.deps import require_roles
+from app.deps import require_roles, get_current_user
 
 router = APIRouter(prefix="/factories", tags=["factories"])
 
@@ -61,6 +61,19 @@ async def list_factories(
     ]
 
     return [FactoryOut.model_validate(factory) for factory in factories] + inferred_factories
+
+
+@router.get("/{factory_id}", response_model=FactoryOut)
+async def get_factory(
+    factory_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Factory).where(Factory.id == factory_id))
+    factory = result.scalar_one_or_none()
+    if not factory:
+        raise HTTPException(status_code=404, detail="Factory not found")
+    return factory
 
 
 @router.post("", response_model=FactoryOut, status_code=201)

@@ -1,5 +1,6 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
@@ -12,8 +13,8 @@ from app.services.serial_numbers import generate_serial_no
 router = APIRouter(prefix="/users", tags=["users"])
 
 def _can_manage_role(actor: User, target_role: UserRole) -> bool:
-    """group_admin can manage any role; factory_manager can only manage operator."""
-    if actor.role == UserRole.group_admin:
+    """system_admin/group_admin can manage any role; factory_manager can only manage operator."""
+    if actor.role in (UserRole.system_admin, UserRole.group_admin):
         return True
     if actor.role == UserRole.factory_manager:
         return target_role == UserRole.operator
@@ -21,8 +22,8 @@ def _can_manage_role(actor: User, target_role: UserRole) -> bool:
 
 
 def _validate_role_factory_assignment(role: UserRole, factory_id: uuid.UUID | None) -> None:
-    if role == UserRole.group_admin and factory_id is not None:
-        raise HTTPException(status_code=400, detail="集团管理员不能绑定所属厂区")
+    if role in (UserRole.system_admin, UserRole.group_admin) and factory_id is not None:
+        raise HTTPException(status_code=400, detail="系统管理员/集团管理员不能绑定所属厂区")
     if role in (UserRole.factory_manager, UserRole.operator) and factory_id is None:
         raise HTTPException(status_code=400, detail="厂区管理员和操作员必须选择所属厂区")
 
@@ -145,3 +146,24 @@ async def batch_update_status(
         updated += 1
     await db.commit()
     return BatchStatusResponse(updated=updated)
+
+
+class PasswordResetRequest(BaseModel):
+    new_password: str
+
+
+@router.post("/{user_id}/reset-password", status_code=204)
+async def reset_password(
+    user_id: uuid.UUID,
+    body: PasswordResetRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: User = Depends(require_roles(UserRole.system_admin, UserRole.group_admin)),
+):
+    result = await db.execute(select(User).where(User.id == user_id))
+    target = result.scalar_one_or_none()
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not _can_manage_role(actor, target.role):
+        raise HTTPException(status_code=403, detail="Cannot reset password for this user")
+    target.password_hash = hash_password(body.new_password)
+    await db.commit()
