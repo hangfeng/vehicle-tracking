@@ -38,9 +38,9 @@ def _validate_role_department_assignment(
 @router.get("", response_model=list[UserOut])
 async def list_users(
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_roles(UserRole.group_admin, UserRole.factory_manager)),
+    user: User = Depends(require_roles(UserRole.group_admin, UserRole.system_admin)),
 ):
-    if user.role == UserRole.group_admin:
+    if user.role in(UserRole.system_admin, UserRole.group_admin):
         result = await db.execute(select(User))
     else:
         result = await db.execute(
