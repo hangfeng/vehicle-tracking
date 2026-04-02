@@ -196,11 +196,12 @@ export default function GateEvents() {
         />
       </Space>
 
-      <Table dataSource={events} columns={columns} rowKey="id" />
+      <Table dataSource={events} columns={columns} rowKey="id" scroll={{ x: 1400 }} />
 
       <Modal
         title="新增出入管理记录"
         open={modalOpen}
+        width="min(680px, calc(100vw - 24px))"
         onOk={handleCreate}
         onCancel={() => {
           setModalOpen(false);

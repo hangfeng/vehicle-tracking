@@ -227,6 +227,7 @@ export default function Users() {
         dataSource={users}
         columns={columns}
         rowKey="id"
+        scroll={{ x: 1100 }}
         rowSelection={{
           selectedRowKeys: selectedIds,
           onChange: (keys) => setSelectedIds(keys as string[]),
@@ -254,6 +255,7 @@ export default function Users() {
       <Drawer
         title={editingUser ? "编辑用户" : "新建用户"}
         open={drawerOpen}
+        width="min(520px, 100vw)"
         onClose={() => setDrawerOpen(false)}
         footer={
           <Button type="primary" onClick={handleSubmit} block>保存</Button>

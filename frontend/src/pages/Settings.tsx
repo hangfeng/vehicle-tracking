@@ -23,10 +23,10 @@ function FactorySelector({
   }, []);
 
   return (
-    <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-      <span style={{ whiteSpace: "nowrap" }}>选择厂区：</span>
+    <div style={{ marginBottom: 16, display: "flex", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
+      <span style={{ whiteSpace: "nowrap", lineHeight: "32px" }}>选择厂区：</span>
       <Select
-        style={{ width: 240 }}
+        style={{ width: "min(320px, 100%)", flex: 1 }}
         placeholder="请选择要管理的厂区"
         value={value}
         onChange={onChange}
@@ -112,12 +112,13 @@ function FactorySettings() {
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增厂区</Button>
       </div>
-      <Table dataSource={factories} columns={columns} rowKey="id" />
+      <Table dataSource={factories} columns={columns} rowKey="id" scroll={{ x: 760 }} />
       <Modal
         title={editing ? "编辑厂区" : "新增厂区"}
         open={modalOpen}
         onOk={handleSubmit}
         onCancel={() => setModalOpen(false)}
+        width="min(640px, calc(100vw - 24px))"
       >
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="厂区名称" rules={[{ required: true }]}>
@@ -196,6 +197,7 @@ function DepartmentSettings({ factoryId }: { factoryId: string | null }) {
       <Table
         dataSource={departments}
         rowKey="id"
+        scroll={{ x: 560 }}
         columns={[
           { title: "部门名称", dataIndex: "name" },
           { title: "状态", dataIndex: "is_active", render: (v: boolean) => <Tag color={v ? "green" : "red"}>{v ? "启用" : "停用"}</Tag> },
@@ -207,6 +209,7 @@ function DepartmentSettings({ factoryId }: { factoryId: string | null }) {
         open={modalOpen}
         onOk={handleSubmit}
         onCancel={() => setModalOpen(false)}
+        width="min(560px, calc(100vw - 24px))"
       >
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="部门名称" rules={[{ required: true, message: "请输入部门名称" }]}>
@@ -316,12 +319,13 @@ function CheckpointSettings({ factoryId }: { factoryId: string | null }) {
           新增节点
         </Button>
       </div>
-      <Table dataSource={checkpoints} columns={columns} rowKey="id" />
+      <Table dataSource={checkpoints} columns={columns} rowKey="id" scroll={{ x: 860 }} />
       <Modal
         title={editing ? "编辑节点" : "新增节点"}
         open={modalOpen}
         onOk={handleSubmit}
         onCancel={() => setModalOpen(false)}
+        width="min(640px, calc(100vw - 24px))"
       >
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="节点名称" rules={[{ required: true, message: "请输入节点名称" }]}>
@@ -454,13 +458,13 @@ function TemplateSettings({ factoryId }: { factoryId: string | null }) {
           新建模板
         </Button>
       </div>
-      <Table dataSource={templates} columns={columns} rowKey="id" />
+      <Table dataSource={templates} columns={columns} rowKey="id" scroll={{ x: 760 }} />
       <Modal
         title={editing ? "编辑路径模板" : "新建路径模板"}
         open={modalOpen}
         onOk={handleSubmit}
         onCancel={() => setModalOpen(false)}
-        width={620}
+        width="min(620px, calc(100vw - 24px))"
         styles={{ body: { maxHeight: "60vh", overflowY: "auto" } }}
       >
         <Form form={form} layout="vertical">
@@ -576,7 +580,7 @@ export default function Settings() {
   return (
     <div>
       <Typography.Title level={4}>系统设置</Typography.Title>
-      <Tabs items={tabs} />
+      <Tabs items={tabs} tabBarGutter={12} />
     </div>
   );
 }

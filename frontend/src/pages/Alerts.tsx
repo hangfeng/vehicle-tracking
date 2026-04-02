@@ -101,7 +101,7 @@ export default function Alerts() {
           <Select.Option value="resolved">已解决</Select.Option>
         </Select>
       </Space>
-      <Table dataSource={alerts} columns={columns} rowKey="id" size="small" />
+      <Table dataSource={alerts} columns={columns} rowKey="id" size="small" scroll={{ x: 760 }} />
       <Modal
         title="处理报警"
         open={!!resolving}

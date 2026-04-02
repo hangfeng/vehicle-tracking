@@ -35,3 +35,40 @@ class AlertReport(BaseModel):
     total_active: int
     total_resolved: int
     by_type: list[AlertSummaryItem]
+
+
+class AccessDetailRow(BaseModel):
+    serial_no: str | None
+    event_time: str
+    plate_number: str
+    direction: str
+    checkpoint_name: str
+    department_name: str | None
+    business_type: str
+    document_no: str | None
+    source: str
+    entered_by_user_name: str | None
+    note: str | None
+
+
+class VehicleDetailRow(BaseModel):
+    serial_no: str | None
+    plate_number: str
+    vehicle_type: str
+    company: str | None
+    contact_name: str | None
+    contact_phone: str | None
+    status: str
+    last_seen_at: str | None
+    note: str | None
+
+
+class UserDetailRow(BaseModel):
+    serial_no: str | None
+    name: str
+    phone: str
+    role: str
+    factory_name: str | None
+    department_name: str | None
+    is_active: bool
+    created_at: str

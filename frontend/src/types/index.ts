@@ -193,3 +193,26 @@ export interface AccessDetailRow {
   entered_by_user_name: string | null;
   note: string | null;
 }
+
+export interface VehicleDetailRow {
+  serial_no: string | null;
+  plate_number: string;
+  vehicle_type: string;
+  company: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
+  status: VehicleStatus;
+  last_seen_at: string | null;
+  note: string | null;
+}
+
+export interface UserDetailRow {
+  serial_no: string | null;
+  name: string;
+  phone: string;
+  role: UserRole;
+  factory_name: string | null;
+  department_name: string | null;
+  is_active: boolean;
+  created_at: string;
+}

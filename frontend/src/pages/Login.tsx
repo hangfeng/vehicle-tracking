@@ -25,7 +25,7 @@ export default function Login() {
         background: "#f0f2f5",
       }}
     >
-      <Card title="厂区车辆管理系统" style={{ width: 360 }}>
+      <Card title="厂区车辆管理系统" style={{ width: "min(360px, calc(100vw - 24px))" }}>
         <Form onFinish={onFinish} layout="vertical">
           <Form.Item
             name="phone"

@@ -117,10 +117,11 @@ export default function Vehicles() {
           <Button icon={<UploadOutlined />}>导入 Excel</Button>
         </Upload>
       </Space>
-      <Table dataSource={vehicles} columns={columns} rowKey="id" size="small" />
+      <Table dataSource={vehicles} columns={columns} rowKey="id" size="small" scroll={{ x: 920 }} />
       <Modal
         title="添加车辆"
         open={adding}
+        width="min(640px, calc(100vw - 24px))"
         onCancel={() => setAdding(false)}
         onOk={() => form.submit()}
       >
