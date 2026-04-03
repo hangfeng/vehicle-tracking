@@ -523,7 +523,7 @@ export default function Settings() {
   const factoryId = canChooseFactory ? selectedFactory : (user?.factory_id ?? null);
 
   const tabs = [
-    ...(user?.role === "group_admin" ? [{ key: "factories", label: "厂区管理", children: <FactorySettings /> }] : []),
+    ...(user?.role === "group_admin"|| user?.role === "system_admin" ? [{ key: "factories", label: "厂区管理", children: <FactorySettings /> }] : []),
     {
       key: "departments",
       label: "部门管理",
